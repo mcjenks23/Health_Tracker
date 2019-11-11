@@ -3,13 +3,14 @@ import "firebase/auth";
 import "firebase/firestore";
 
 const config = {
-  apiKey: "AIzaSyAWPqfo5ycw82KR72s5fRHTYtf1mEek8h8",
-  authDomain: "authentication-64d08.firebaseapp.com",
-  databaseURL: "https://authentication-64d08.firebaseio.com",
-  projectId: "authentication-64d08",
-  storageBucket: "",
-  messagingSenderId: "404553418409",
-  appId: "1:404553418409:web:694d62963d637722900bb8"
+  apiKey: "AIzaSyAX4TaYyVlsLlzFEwEqBLhMANnCe-M4q88",
+  authDomain: "health-tracker-4e0ed.firebaseapp.com",
+  databaseURL: "https://health-tracker-4e0ed.firebaseio.com",
+  projectId: "health-tracker-4e0ed",
+  storageBucket: "health-tracker-4e0ed.appspot.com",
+  messagingSenderId: "217793234650",
+  appId: "1:217793234650:web:3d89b5c89a6df566a347e3",
+  measurementId: "G-KW8GKLEXN5"
 };
 
 firebase.initializeApp(config);
