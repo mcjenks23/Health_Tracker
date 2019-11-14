@@ -6,7 +6,7 @@ import Button from "@material-ui/core/Button";
 import IconButton from "@material-ui/core/IconButton";
 import MenuIcon from "@material-ui/icons/Menu";
 import Drawer from "@material-ui/core/Drawer";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 import List from "@material-ui/core/List";
 import { Link } from "react-router-dom";
 import ListItem from "@material-ui/core/ListItem";
@@ -20,6 +20,8 @@ import SatisfiedIcon from "@material-ui/icons/SentimentSatisfied";
 import VeryDissatisfiedIcon from "@material-ui/icons/SentimentVeryDissatisfied";
 import VerySatisfiedIcon from "@material-ui/icons/SentimentVerySatisfied";
 import { Line } from "react-chartjs-2";
+var unirest = require("unirest");
+var moment = require("moment");
 
 export function App(props) {
   const [drawer_open, setDrawerOpen] = useState(false);
@@ -103,8 +105,33 @@ export function App(props) {
           </ListItem>
         </List>
       </Drawer>
-      <Route exact path="/app" component={Survey} />
-      <Route path="/app/charts" component={Charts} />
+      <Route
+        exact
+        path="/app/"
+        render={routeProps => {
+          return (
+            <Survey
+              user={user}
+              match={routeProps.match}
+              location={routeProps.location}
+              history={routeProps.history}
+            />
+          );
+        }}
+      />
+      <Route
+        path="/app/charts/"
+        render={routeProps => {
+          return (
+            <Charts
+              user={user}
+              match={routeProps.match}
+              location={routeProps.location}
+              history={routeProps.history}
+            />
+          );
+        }}
+      />
     </div>
   );
 }
@@ -112,6 +139,53 @@ export function App(props) {
 function Survey(props) {
   const [radioValue, setRadioValue] = useState(2);
   const [sleep, setSleep] = useState(8);
+  const [temp, setTemp] = useState(70);
+  const [lat, setLat] = useState();
+  const [lon, setLon] = useState();
+
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(position => {
+      setLat(position.coords.latitude);
+      setLon(position.coords.longitude);
+    });
+  }, []);
+
+  useEffect(() => {
+    var req = unirest(
+      "GET",
+      "https://community-open-weather-map.p.rapidapi.com/weather"
+    );
+
+    req.query({
+      lat: lat,
+      lon: lon,
+      units: "imperial"
+    });
+
+    req.headers({
+      "x-rapidapi-host": "community-open-weather-map.p.rapidapi.com",
+      "x-rapidapi-key": "2ab76a46c3msh95a7e9a72dc4326p1f1d13jsna9d018bfce1d"
+    });
+
+    req.end(function(res) {
+      if (res.error) throw new Error(res.error);
+
+      setTemp(res.body.main.temp);
+      console.log(lon);
+    });
+  }, [lat, lon]);
+
+  const handleSave = () => {
+    const today = moment().format("YYYY-MM-DD HH:mm");
+    db.collection("users")
+      .doc(props.user.uid)
+      .collection("surveys")
+      .add({ temperature: temp, sleep: sleep, happy: radioValue, date: today })
+      .then(() => {
+        props.history.push("/app/charts/");
+      });
+  };
+
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
       <Paper style={{ padding: 30, width: 400, marginTop: 30 }}>
@@ -165,7 +239,12 @@ function Survey(props) {
           />
         </div>
         <div>
-          <Button variant="contained" color="primary" style={{ marginTop: 20 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            style={{ marginTop: 20 }}
+            onClick={handleSave}
+          >
             Save
           </Button>
         </div>
@@ -175,50 +254,110 @@ function Survey(props) {
 }
 
 function Charts(props) {
+  const [temperature, setTemperature] = useState([]);
+  const [happiness, setHappiness] = useState([]);
+  const [sleep, setSleep] = useState([]);
+
+  useEffect(() => {
+    const unsubscribe = db
+      .collection("users")
+      .doc(props.user.uid)
+      .collection("surveys")
+      .onSnapshot(snapshot => {
+        let tempArray = [];
+        let happyArray = [];
+        let sleepArray = [];
+
+        snapshot.forEach(s => {
+          const data = s.data();
+          tempArray.push({ x: data.date, y: data.temperature });
+          happyArray.push({ x: data.date, y: data.happy });
+          sleepArray.push({ x: data.date, y: data.sleep });
+        });
+
+        tempArray = tempArray.sort((a, b) => {
+          if (a.x > b.x) {
+            return -1;
+          } else {
+            return 1;
+          }
+        });
+
+        happyArray = happyArray.sort((a, b) => {
+          if (a.x > b.x) {
+            return -1;
+          } else {
+            return 1;
+          }
+        });
+
+        sleepArray = sleepArray.sort((a, b) => {
+          if (a.x > b.x) {
+            return -1;
+          } else {
+            return 1;
+          }
+        });
+
+        setTemperature(tempArray);
+        setHappiness(happyArray);
+        setSleep(sleepArray);
+      });
+    return unsubscribe;
+  }, [props]);
+
   const data = {
     datasets: [
       {
-        label: "Temperature",
-        data: [
-          { x: "2019-01-01", y: 70 },
-          { x: "2019-01-05", y: 60 },
-          { x: "2019-01-10", y: 53 }
-        ],
+        label: "Happiness",
+        data: happiness,
         backgroundColor: "transparent",
-        borderColor: "blue",
-        yAxesID: "A"
+        borderColor: "red",
+        yAxisID: "y-axis-2"
       },
       {
         label: "Sleep",
-        data: [
-          { x: "2019-01-01", y: 6 },
-          { x: "2019-01-05", y: 7 },
-          { x: "2019-01-10", y: 6 }
-        ],
+        data: sleep,
         backgroundColor: "transparent",
-        borderColor: "green",
-        yAxesID: "B"
+        borderColor: "blue",
+        yAxisID: "y-axis-2"
       },
       {
-        label: "Happiness",
-        data: [
-          { x: "2019-01-01", y: 7 },
-          { x: "2019-01-05", y: 5 },
-          { x: "2019-01-10", y: 3 }
-        ],
+        label: "Temperature",
+        data: temperature,
         backgroundColor: "transparent",
-        borderColor: "red",
-        yAxesID: "B"
+        borderColor: "green",
+        yAxisID: "y-axis-1"
       }
     ]
   };
 
   const options = {
     scales: {
-      yAxes: [{ id: "A", position: "left" }, { id: "B", position: "right" }],
-      xAxes: [{ type: "time", time: { displayFormats: { hour: "MMM D" } } }]
+      yAxes: [
+        {
+          type: "linear", // only linear but allow scale type registration. This allows extensions to exist solely for log scale for instance
+          display: true,
+          position: "left",
+          id: "y-axis-1"
+        },
+        {
+          type: "linear", // only linear but allow scale type registration. This allows extensions to exist solely for log scale for instance
+          display: true,
+          position: "right",
+          id: "y-axis-2"
+          // grid line settings
+        }
+      ],
+      xAxes: [
+        {
+          type: "time",
+          time: { DisplayFormats: { hour: "MM D" } }
+        }
+      ]
     }
   };
+
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
       <Paper style={{ width: 600, marginTop: 30, padding: 30 }}>
