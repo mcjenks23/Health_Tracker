@@ -352,7 +352,7 @@ function Charts(props) {
       xAxes: [
         {
           type: "time",
-          time: { DisplayFormats: { hour: "MM D" } }
+          time: { displayFormats: { hour: "MMM D" } }
         }
       ]
     }
